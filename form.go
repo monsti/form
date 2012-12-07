@@ -48,6 +48,10 @@ type FieldRenderData struct {
 type RenderData struct {
 	Fields []FieldRenderData
 	Errors []string
+	// EncTypeAttr is set to 'enctype="multipart/form-data"' if the Form
+	// contains a File widget. Should be used as optional attribute for the form
+	// element if the form may contain file input elements.
+	EncTypeAttr string
 }
 
 type Widget interface {
@@ -115,6 +119,15 @@ func (t HiddenWidget) HTML(field string, value interface{}) template.HTML {
 			strings.ToLower(field), field, value))
 }
 
+// FileWidget renders a file upload field.
+type FileWidget int
+
+func (t FileWidget) HTML(field string, value interface{}) template.HTML {
+	return template.HTML(
+		fmt.Sprintf(`<input id="%v" type="file" name="%v"/>`,
+			strings.ToLower(field), field))
+}
+
 // Field contains settings for a form field.
 type Field struct {
 	Label, Help string
@@ -159,6 +172,8 @@ func (f Form) RenderData() (renderData RenderData) {
 		widget := setup.Widget
 		if widget == nil {
 			widget = new(Text)
+		} else if _, ok := widget.(*FileWidget); ok {
+			renderData.EncTypeAttr = "multipart/form-data"
 		}
 		renderData.Fields = append(renderData.Fields, FieldRenderData{
 			Label: setup.Label,
@@ -218,9 +233,11 @@ func (f *Form) validate() bool {
 			panic(fmt.Sprintf("Field '%v' not present in form data structure.",
 				name))
 		}
-		if errors := field.Validator(value.Interface()); errors != nil {
-			f.errors[name] = errors
-			anyError = true
+		if field.Validator != nil {
+			if errors := field.Validator(value.Interface()); errors != nil {
+				f.errors[name] = errors
+				anyError = true
+			}
 		}
 	}
 	return !anyError

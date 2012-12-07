@@ -65,6 +65,41 @@ func TestRender(t *testing.T) {
 	}
 }
 
+type TestDataEncTypeAttr struct {
+	Name string
+	File string
+}
+
+func TestEncTypeAttr(t *testing.T) {
+	data := TestDataEncTypeAttr{}
+	vals := url.Values{
+		"Name": []string{""}}
+	fieldTests := []struct {
+		Form    *Form
+		EncType string
+	}{
+		{
+			Form: NewForm(&data, Fields{
+				"Name": Field{"Your name", "Your full name", Required("Req!"),
+					nil},
+				"File": Field{"File Dummy", "", nil, nil}}),
+			EncType: ""},
+		{
+			Form: NewForm(&data, Fields{
+				"Name": Field{"Your name", "Your full name", Required("Req!"), nil},
+				"File": Field{"File!", "", nil, new(FileWidget)}}),
+			EncType: "multipart/form-data"}}
+
+	for i, v := range fieldTests {
+		v.Form.Fill(vals)
+		renderData := v.Form.RenderData()
+		if renderData.EncTypeAttr != v.EncType {
+			t.Errorf("Test %v: RenderData.EncTypeAttr is %q, should be %q", i,
+				renderData.EncTypeAttr, v.EncType)
+		}
+	}
+}
+
 func TestFill(t *testing.T) {
 	data := TestData{}
 	form := NewForm(&data, Fields{
@@ -174,6 +209,16 @@ func TestHiddenWidget(t *testing.T) {
 	expected := `<input id="foo" type="hidden" name="Foo" value="bar"/>`
 	if string(ret) != expected {
 		t.Errorf(`HiddenWidget.HTML("Foo", "bar") = "%v", should be "%v".`,
+			ret, expected)
+	}
+}
+
+func TestFileWidget(t *testing.T) {
+	widget := new(FileWidget)
+	ret := widget.HTML("Foo", "")
+	expected := `<input id="foo" type="file" name="Foo"/>`
+	if string(ret) != expected {
+		t.Errorf(`FileWidget.HTML("Foo", "") = "%v", should be "%v".`,
 			ret, expected)
 	}
 }
