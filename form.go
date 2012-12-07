@@ -51,7 +51,7 @@ type RenderData struct {
 	// EncTypeAttr is set to 'enctype="multipart/form-data"' if the Form
 	// contains a File widget. Should be used as optional attribute for the form
 	// element if the form may contain file input elements.
-	EncTypeAttr string
+	EncTypeAttr template.HTMLAttr
 }
 
 type Widget interface {
@@ -173,7 +173,7 @@ func (f Form) RenderData() (renderData RenderData) {
 		if widget == nil {
 			widget = new(Text)
 		} else if _, ok := widget.(*FileWidget); ok {
-			renderData.EncTypeAttr = "multipart/form-data"
+			renderData.EncTypeAttr = `enctype="multipart/form-data"`
 		}
 		renderData.Fields = append(renderData.Fields, FieldRenderData{
 			Label: setup.Label,

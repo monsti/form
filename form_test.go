@@ -88,12 +88,12 @@ func TestEncTypeAttr(t *testing.T) {
 			Form: NewForm(&data, Fields{
 				"Name": Field{"Your name", "Your full name", Required("Req!"), nil},
 				"File": Field{"File!", "", nil, new(FileWidget)}}),
-			EncType: "multipart/form-data"}}
+			EncType: `enctype="multipart/form-data"`}}
 
 	for i, v := range fieldTests {
 		v.Form.Fill(vals)
 		renderData := v.Form.RenderData()
-		if renderData.EncTypeAttr != v.EncType {
+		if string(renderData.EncTypeAttr) != v.EncType {
 			t.Errorf("Test %v: RenderData.EncTypeAttr is %q, should be %q", i,
 				renderData.EncTypeAttr, v.EncType)
 		}
