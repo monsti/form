@@ -119,6 +119,15 @@ func (t HiddenWidget) HTML(field string, value interface{}) template.HTML {
 			strings.ToLower(field), field, value))
 }
 
+// PasswordWidget renders a password field.
+type PasswordWidget int
+
+func (t PasswordWidget) HTML(field string, value interface{}) template.HTML {
+	return template.HTML(
+		fmt.Sprintf(`<input id="%v" type="password" name="%v"/>`,
+			strings.ToLower(field), field))
+}
+
 // FileWidget renders a file upload field.
 type FileWidget int
 

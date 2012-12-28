@@ -222,3 +222,13 @@ func TestFileWidget(t *testing.T) {
 			ret, expected)
 	}
 }
+
+func TestPasswordWidget(t *testing.T) {
+	widget := new(PasswordWidget)
+	ret := widget.HTML("Foo", "")
+	expected := `<input id="foo" type="password" name="Foo"/>`
+	if string(ret) != expected {
+		t.Errorf(`PasswordWidget.HTML("Foo", "") = "%v", should be "%v".`,
+			ret, expected)
+	}
+}
