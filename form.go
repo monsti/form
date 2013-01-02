@@ -199,12 +199,11 @@ func (f Form) RenderData() (renderData RenderData) {
 // AddError adds an error to a field's error list.
 //
 // To add global form errors, use an empty string as the field's name.
-func (f Form) AddError(field string, error string) {
-	e := f.errors[field]
-	if e == nil {
-		e = make([]string, 1)
+func (f *Form) AddError(field string, error string) {
+	if f.errors[field] == nil {
+		f.errors[field] = make([]string, 0, 1)
 	}
-	e = append(e, error)
+	f.errors[field] = append(f.errors[field], error)
 }
 
 // Fill fills the form data with the given values and validates the form.

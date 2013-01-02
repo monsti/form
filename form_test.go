@@ -17,6 +17,7 @@
 package form
 
 import (
+	"log"
 	"net/url"
 	"reflect"
 	"testing"
@@ -62,6 +63,28 @@ func TestRender(t *testing.T) {
 			t.Errorf("RenderData for Field '%v' =\n%v,\nexpected\n%v",
 				test.Field, renderData.Fields[i], test.Expected)
 		}
+	}
+}
+
+func TestAddError(t *testing.T) {
+	data := TestData{}
+	form := NewForm(&data, Fields{
+		"Name": Field{"Your name", "Your full name", Required("Req!"), nil},
+		"Age":  Field{"Your age", "Years since your birth.", Required("Req!"), nil}})
+	form.AddError("Name", "Foo")
+	form.AddError("", "Bar")
+	renderData := form.RenderData()
+	log.Println(renderData)
+	if len(renderData.Fields[0].Errors) != 1 ||
+		renderData.Fields[0].Errors[0] != "Foo" {
+		t.Errorf(`Field "Name" should have error "Foo"`)
+	}
+	if len(renderData.Errors) != 1 ||
+		renderData.Errors[0] != "Bar" {
+		t.Errorf(`Missing global error "Bar"`)
+	}
+	if len(renderData.Fields[1].Errors) != 0 {
+		t.Errorf(`Field "Bar" should have no errors`)
 	}
 }
 
