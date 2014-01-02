@@ -1,5 +1,5 @@
 // This file is part of monsti/form.
-// Copyright 2012 Christian Neumann
+// Copyright 2012-2014 Christian Neumann
 
 // monsti/form is free software: you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -18,13 +18,14 @@ package form
 
 import (
 	"fmt"
-	"github.com/gorilla/schema"
 	"html"
 	"html/template"
 	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
+
+	"github.com/gorilla/schema"
 )
 
 var schemaDecoder = schema.NewDecoder()
@@ -44,7 +45,7 @@ type FieldRenderData struct {
 	Errors []string
 }
 
-// RenderData contains the data needed for form rendering. 
+// RenderData contains the data needed for form rendering.
 type RenderData struct {
 	Fields []FieldRenderData
 	Errors []string
@@ -156,6 +157,8 @@ type Form struct {
 
 // NewForm creates a new Form with the given fields with data stored in the
 // given pointer to a structure.
+//
+// In panics if data is not a pointer to a struct.
 func NewForm(data interface{}, fields Fields) *Form {
 	if dataType := reflect.TypeOf(data); dataType.Kind() != reflect.Ptr ||
 		dataType.Elem().Kind() != reflect.Struct {
@@ -167,6 +170,8 @@ func NewForm(data interface{}, fields Fields) *Form {
 }
 
 // RenderData returns a RenderData struct for the form.
+//
+// It panics if a field has not been set up.
 func (f Form) RenderData() (renderData RenderData) {
 	dataVal := reflect.ValueOf(f.data).Elem()
 	renderData.Fields = make([]FieldRenderData, 0, dataVal.NumField()-1)
@@ -176,7 +181,7 @@ func (f Form) RenderData() (renderData RenderData) {
 		name := strings.ToLower(fieldType.Name)
 		setup, ok := f.Fields[fieldType.Name]
 		if !ok {
-			panic("Field " + fieldType.Name + " has not been set up.")
+			continue
 		}
 		widget := setup.Widget
 		if widget == nil {
@@ -207,6 +212,9 @@ func (f *Form) AddError(field string, error string) {
 }
 
 // Fill fills the form data with the given values and validates the form.
+//
+// It panics if a field has been set up which is not present in the
+// data struct.
 //
 // Returns true iff the form validates.
 func (f *Form) Fill(values url.Values) bool {
