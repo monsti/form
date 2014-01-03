@@ -1,5 +1,5 @@
 // This file is part of monsti/form.
-// Copyright 2012 Christian Neumann
+// Copyright 2012-2014 Christian Neumann
 
 // monsti/form is free software: you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -17,31 +17,44 @@
 package form
 
 import (
-	"log"
 	"net/url"
 	"reflect"
 	"testing"
 )
 
+type TestDataEmbed struct {
+}
+
 type TestData struct {
-	Name string
-	Age  int
+	Title string
+	Name  string
+	Age   int
 }
 
 func TestRender(t *testing.T) {
 	data := TestData{}
 	form := NewForm(&data, Fields{
-		"Name": Field{"Your name", "Your full name", Required("Req!"), nil},
-		"Age":  Field{"Your age", "Years since your birth.", Required("Req!"), nil}})
+		"Title": Field{"Your title", "", nil, nil},
+		"Name":  Field{"Your name", "Your full name", Required("Req!"), nil},
+		"Age":   Field{"Your age", "Years since your birth.", Required("Req!"), nil}})
 	vals := url.Values{
-		"Name": []string{""},
-		"Age":  []string{"14"}}
+		"Title": []string{""},
+		"Name":  []string{""},
+		"Age":   []string{"14"}}
 	form.Fill(vals)
 	renderData := form.RenderData()
 	fieldTests := []struct {
 		Field    string
 		Expected FieldRenderData
 	}{
+		{
+			Field: "Title",
+			Expected: FieldRenderData{
+				Label:    "Your title",
+				LabelTag: `<label for="Title">Your title</label>`,
+				Help:     "",
+				Errors:   nil,
+				Input:    `<input id="Title" type="text" name="Title" value=""/>`}},
 		{
 			Field: "Name",
 			Expected: FieldRenderData{
@@ -74,7 +87,6 @@ func TestAddError(t *testing.T) {
 	form.AddError("Name", "Foo")
 	form.AddError("", "Bar")
 	renderData := form.RenderData()
-	log.Println(renderData)
 	if len(renderData.Fields[0].Errors) != 1 ||
 		renderData.Fields[0].Errors[0] != "Foo" {
 		t.Errorf(`Field "Name" should have error "Foo"`)
@@ -132,7 +144,8 @@ func TestFill(t *testing.T) {
 		"Name": []string{"Foo"},
 		"Age":  []string{"14"}}
 	if !form.Fill(vals) {
-		t.Errorf("form.Fill(..) returns false, should be true.")
+		t.Errorf("form.Fill(..) returns false, should be true. Errors: %v",
+			form.RenderData().Errors)
 	}
 	vals["Name"] = []string{""}
 	data.Name = ""

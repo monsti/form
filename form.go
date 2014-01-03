@@ -171,31 +171,34 @@ func NewForm(data interface{}, fields Fields) *Form {
 
 // RenderData returns a RenderData struct for the form.
 //
-// It panics if a field has not been set up.
+// It panics if a registered field is not present in the data struct.
 func (f Form) RenderData() (renderData RenderData) {
 	dataVal := reflect.ValueOf(f.data).Elem()
 	renderData.Fields = make([]FieldRenderData, 0, dataVal.NumField()-1)
-	for i := 0; i < dataVal.NumField(); i++ {
-		fieldType := dataVal.Type().Field(i)
-		fieldVal := dataVal.Field(i)
-		name := strings.ToLower(fieldType.Name)
-		setup, ok := f.Fields[fieldType.Name]
-		if !ok {
-			continue
-		}
-		widget := setup.Widget
+	for name, field := range f.Fields {
+		widget := field.Widget
 		if widget == nil {
 			widget = new(Text)
 		} else if _, ok := widget.(*FileWidget); ok {
 			renderData.EncTypeAttr = `enctype="multipart/form-data"`
 		}
+		matchFunc := func(field string) bool {
+			if strings.ToLower(field) == strings.ToLower(name) {
+				return true
+			}
+			return false
+		}
+		fieldVal := dataVal.FieldByNameFunc(matchFunc)
+		if !fieldVal.IsValid() {
+			panic("form: Registered field not present in data struct: " + name)
+		}
 		renderData.Fields = append(renderData.Fields, FieldRenderData{
-			Label: setup.Label,
+			Label: field.Label,
 			LabelTag: template.HTML(fmt.Sprintf(`<label for="%v">%v</label>`,
-				name, setup.Label)),
-			Input:  widget.HTML(fieldType.Name, fieldVal.Interface()),
-			Help:   setup.Help,
-			Errors: f.errors[fieldType.Name]})
+				name, field.Label)),
+			Input:  widget.HTML(name, fieldVal.Interface()),
+			Help:   field.Help,
+			Errors: f.errors[name]})
 	}
 	renderData.Errors = f.errors[""]
 	return
@@ -218,15 +221,21 @@ func (f *Form) AddError(field string, error string) {
 //
 // Returns true iff the form validates.
 func (f *Form) Fill(values url.Values) bool {
-	error := schemaDecoder.Decode(f.data, values)
+	decoder := schema.NewDecoder()
+	decoder.RegisterConverter(time.Time{}, timeConverter)
+	error := decoder.Decode(f.data, values)
 	switch e := error.(type) {
 	case nil:
 		return f.validate()
 	case schema.MultiError:
 		for field, msg := range e {
-			if f.errors[field] == nil {
+			v, ok := f.errors[field]
+			switch {
+			case !ok:
+				f.errors[""] = []string{msg.Error()}
+			case v == nil:
 				f.errors[field] = []string{msg.Error()}
-			} else {
+			default:
 				f.errors[field] = append(f.errors[field], msg.Error())
 			}
 		}
@@ -234,7 +243,6 @@ func (f *Form) Fill(values url.Values) bool {
 	default:
 		panic(error.Error())
 	}
-	return true
 }
 
 // validate validates the currently present data.
