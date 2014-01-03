@@ -46,18 +46,18 @@ func TestRender(t *testing.T) {
 			Field: "Name",
 			Expected: FieldRenderData{
 				Label:    "Your name",
-				LabelTag: `<label for="name">Your name</label>`,
+				LabelTag: `<label for="Name">Your name</label>`,
 				Help:     "Your full name",
 				Errors:   []string{"Req!"},
-				Input:    `<input id="name" type="text" name="Name" value=""/>`}},
+				Input:    `<input id="Name" type="text" name="Name" value=""/>`}},
 		{
-			Field: "Age",
+			Field: "AGE",
 			Expected: FieldRenderData{
 				Label:    "Your age",
-				LabelTag: `<label for="age">Your age</label>`,
+				LabelTag: `<label for="Age">Your age</label>`,
 				Help:     "Years since your birth.",
 				Errors:   nil,
-				Input:    `<input id="age" type="text" name="Age" value="14"/>`}}}
+				Input:    `<input id="Age" type="text" name="Age" value="14"/>`}}}
 	for i, test := range fieldTests {
 		if !reflect.DeepEqual(renderData.Fields[i], test.Expected) {
 			t.Errorf("RenderData for Field '%v' =\n%v,\nexpected\n%v",
@@ -201,19 +201,19 @@ func TestSelectWidget(t *testing.T) {
 	tests := []struct {
 		Name, Value, Expected string
 	}{
-		{"TestSelect", "", `<select id="testselect" name="TestSelect">
+		{"TestSelect", "", `<select id="TestSelect" name="TestSelect">
 <option value="foo">The Foo!</option>
 <option value="bar">The Bar!</option>
 </select>`},
-		{"TestSelect2", "unknown!", `<select id="testselect2" name="TestSelect2">
+		{"TestSelect2", "unknown!", `<select id="TestSelect2" name="TestSelect2">
 <option value="foo">The Foo!</option>
 <option value="bar">The Bar!</option>
 </select>`},
-		{"TestSelect3", "foo", `<select id="testselect3" name="TestSelect3">
+		{"TestSelect3", "foo", `<select id="TestSelect3" name="TestSelect3">
 <option value="foo" selected>The Foo!</option>
 <option value="bar">The Bar!</option>
 </select>`},
-		{"TestSelect4", "bar", `<select id="testselect4" name="TestSelect4">
+		{"TestSelect4", "bar", `<select id="TestSelect4" name="TestSelect4">
 <option value="foo">The Foo!</option>
 <option value="bar" selected>The Bar!</option>
 </select>`}}
@@ -228,8 +228,8 @@ func TestSelectWidget(t *testing.T) {
 
 func TestHiddenWidget(t *testing.T) {
 	widget := new(HiddenWidget)
-	ret := widget.HTML("Foo", "bar")
-	expected := `<input id="foo" type="hidden" name="Foo" value="bar"/>`
+	ret := widget.HTML("foo", "bar")
+	expected := `<input id="foo" type="hidden" name="foo" value="bar"/>`
 	if string(ret) != expected {
 		t.Errorf(`HiddenWidget.HTML("Foo", "bar") = "%v", should be "%v".`,
 			ret, expected)
@@ -238,8 +238,8 @@ func TestHiddenWidget(t *testing.T) {
 
 func TestFileWidget(t *testing.T) {
 	widget := new(FileWidget)
-	ret := widget.HTML("Foo", "")
-	expected := `<input id="foo" type="file" name="Foo"/>`
+	ret := widget.HTML("foo", "")
+	expected := `<input id="foo" type="file" name="foo"/>`
 	if string(ret) != expected {
 		t.Errorf(`FileWidget.HTML("Foo", "") = "%v", should be "%v".`,
 			ret, expected)
@@ -248,8 +248,8 @@ func TestFileWidget(t *testing.T) {
 
 func TestPasswordWidget(t *testing.T) {
 	widget := new(PasswordWidget)
-	ret := widget.HTML("Foo", "")
-	expected := `<input id="foo" type="password" name="Foo"/>`
+	ret := widget.HTML("foo", "")
+	expected := `<input id="foo" type="password" name="foo"/>`
 	if string(ret) != expected {
 		t.Errorf(`PasswordWidget.HTML("Foo", "") = "%v", should be "%v".`,
 			ret, expected)

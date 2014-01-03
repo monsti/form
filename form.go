@@ -64,7 +64,7 @@ type Text int
 func (t Text) HTML(field string, value interface{}) template.HTML {
 	return template.HTML(fmt.Sprintf(
 		`<input id="%v" type="text" name="%v" value="%v"/>`,
-		strings.ToLower(field), field, html.EscapeString(
+		field, field, html.EscapeString(
 			fmt.Sprintf("%v", value))))
 }
 
@@ -73,7 +73,7 @@ type AlohaEditor int
 func (t AlohaEditor) HTML(field string, value interface{}) template.HTML {
 	return template.HTML(fmt.Sprintf(
 		`<textarea class="editor" id="%v" name="%v"/>%v</textarea>`,
-		strings.ToLower(field), field, html.EscapeString(
+		field, field, html.EscapeString(
 			fmt.Sprintf("%v", value))))
 }
 
@@ -82,7 +82,7 @@ type TextArea int
 func (t TextArea) HTML(field string, value interface{}) template.HTML {
 	return template.HTML(fmt.Sprintf(
 		`<textarea id="%v" name="%v"/>%v</textarea>`,
-		strings.ToLower(field), field, html.EscapeString(
+		field, field, html.EscapeString(
 			fmt.Sprintf("%v", value))))
 }
 
@@ -107,7 +107,7 @@ func (t SelectWidget) HTML(field string, value interface{}) template.HTML {
 			v.Value, selected, v.Text)
 	}
 	ret := fmt.Sprintf("<select id=\"%v\" name=\"%v\">\n%v</select>",
-		strings.ToLower(field), field, options)
+		field, field, options)
 	return template.HTML(ret)
 }
 
@@ -117,7 +117,7 @@ type HiddenWidget int
 func (t HiddenWidget) HTML(field string, value interface{}) template.HTML {
 	return template.HTML(
 		fmt.Sprintf(`<input id="%v" type="hidden" name="%v" value="%v"/>`,
-			strings.ToLower(field), field, value))
+			field, field, value))
 }
 
 // PasswordWidget renders a password field.
@@ -126,7 +126,7 @@ type PasswordWidget int
 func (t PasswordWidget) HTML(field string, value interface{}) template.HTML {
 	return template.HTML(
 		fmt.Sprintf(`<input id="%v" type="password" name="%v"/>`,
-			strings.ToLower(field), field))
+			field, field))
 }
 
 // FileWidget renders a file upload field.
@@ -135,7 +135,7 @@ type FileWidget int
 func (t FileWidget) HTML(field string, value interface{}) template.HTML {
 	return template.HTML(
 		fmt.Sprintf(`<input id="%v" type="file" name="%v"/>`,
-			strings.ToLower(field), field))
+			field, field))
 }
 
 // Field contains settings for a form field.
