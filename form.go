@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/gorilla/schema"
 )
@@ -57,6 +58,60 @@ type RenderData struct {
 
 type Widget interface {
 	HTML(name string, value interface{}) template.HTML
+}
+
+// timeConverter converts a string to a time.Time
+func timeConverter(in string) reflect.Value {
+	out, err := time.Parse(time.RFC3339, in)
+	if err != nil {
+		out, err = time.Parse("2006-01-02", in)
+	}
+	if err != nil {
+		out, _ = time.Parse("15:04:05", in)
+	}
+	return reflect.ValueOf(out)
+}
+
+type DateTimeWidget int
+
+func (t DateTimeWidget) HTML(field string, value interface{}) template.HTML {
+	var out string
+	if obj, ok := value.(time.Time); ok {
+		out = obj.Format(time.RFC3339)
+	} else {
+		out = fmt.Sprintf("%v", obj)
+	}
+	return template.HTML(fmt.Sprintf(
+		`<input id="%v" type="datetime" name="%v" value="%v"/>`,
+		field, field, html.EscapeString(out)))
+}
+
+type DateWidget int
+
+func (t DateWidget) HTML(field string, value interface{}) template.HTML {
+	var out string
+	if obj, ok := value.(time.Time); ok {
+		out = obj.Format("2006-01-02")
+	} else {
+		out = fmt.Sprintf("%v", obj)
+	}
+	return template.HTML(fmt.Sprintf(
+		`<input id="%v" type="date" name="%v" value="%v"/>`,
+		field, field, html.EscapeString(out)))
+}
+
+type TimeWidget int
+
+func (t TimeWidget) HTML(field string, value interface{}) template.HTML {
+	var out string
+	if obj, ok := value.(time.Time); ok {
+		out = obj.Format("15:04:05")
+	} else {
+		out = fmt.Sprintf("%v", obj)
+	}
+	return template.HTML(fmt.Sprintf(
+		`<input id="%v" type="time" name="%v" value="%v"/>`,
+		field, field, html.EscapeString(out)))
 }
 
 type Text int

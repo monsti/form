@@ -17,9 +17,11 @@
 package form
 
 import (
+	"html/template"
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 )
 
 type TestDataEmbed struct {
@@ -267,4 +269,55 @@ func TestPasswordWidget(t *testing.T) {
 		t.Errorf(`PasswordWidget.HTML("Foo", "") = "%v", should be "%v".`,
 			ret, expected)
 	}
+}
+
+func testWidget(t *testing.T, widget Widget, data interface{}, input string,
+	value interface{}, urlValue string) {
+	form := NewForm(data, Fields{"ID": Field{"T", "H", nil, widget}})
+	vals := url.Values{"ID": []string{urlValue}}
+	form.Fill(vals)
+	renderData := form.RenderData()
+	if renderData.Fields[0].Input != template.HTML(input) {
+		t.Errorf("Input field is\n%v\nshould be \n%v",
+			renderData.Fields[0].Input, input)
+	}
+	if reflect.DeepEqual(reflect.ValueOf(value),
+		reflect.ValueOf(data).Elem().FieldByName("ID")) {
+		t.Errorf("Data is\n%v\nshould be \n%v", data, value)
+	}
+}
+
+type TestDateTimeWidgetData struct {
+	ID time.Time
+}
+
+func TestDateTimeWidget(t *testing.T) {
+	data := TestDateTimeWidgetData{}
+	input := `<input id="ID" type="datetime" name="ID" value="2008-09-08T22:47:31-07:00"/>`
+	value, err := time.Parse(time.RFC3339, "2008-09-08T22:47:31-07:00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testWidget(t, new(DateTimeWidget), &data, input, value,
+		"2008-09-08T22:47:31-07:00")
+}
+
+func TestDateWidget(t *testing.T) {
+	data := TestDateTimeWidgetData{}
+	input := `<input id="ID" type="date" name="ID" value="2008-09-08"/>`
+	value, err := time.Parse("2006-01-02", "2008-09-08")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testWidget(t, new(DateWidget), &data, input, value, "2008-09-08")
+}
+
+func TestTimeWidget(t *testing.T) {
+	data := TestDateTimeWidgetData{}
+	input := `<input id="ID" type="time" name="ID" value="22:47:31"/>`
+	value, err := time.Parse("15:04:05", "22:47:31")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testWidget(t, new(TimeWidget), &data, input, value, "22:47:31")
 }
