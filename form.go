@@ -29,8 +29,6 @@ import (
 	"github.com/gorilla/schema"
 )
 
-var schemaDecoder = schema.NewDecoder()
-
 // FieldRenderData contains the data needed for field rendering.
 type FieldRenderData struct {
 	// Lebel is the field's label.
