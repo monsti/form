@@ -25,12 +25,13 @@ import (
 )
 
 type TestDataEmbed struct {
+	Title string
 }
 
 type TestData struct {
-	Title string
-	Name  string
-	Age   int
+	TestDataEmbed
+	Name string
+	Age  int
 }
 
 func TestRender(t *testing.T) {
@@ -74,6 +75,9 @@ func TestRender(t *testing.T) {
 				Errors:   nil,
 				Input:    `<input id="Age" type="text" name="Age" value="14"/>`}}}
 	for i, test := range fieldTests {
+		if len(renderData.Errors) > 0 {
+			t.Errorf("RenderData contains general errors: %v", renderData.Errors)
+		}
 		if !reflect.DeepEqual(renderData.Fields[i], test.Expected) {
 			t.Errorf("RenderData for Field '%v' =\n%v,\nexpected\n%v",
 				test.Field, renderData.Fields[i], test.Expected)
