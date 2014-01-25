@@ -275,12 +275,17 @@ func TestPasswordWidget(t *testing.T) {
 	}
 }
 
-func testWidget(t *testing.T, widget Widget, data interface{}, input string,
-	value interface{}, urlValue string) {
+func testWidget(t *testing.T, widget Widget, data interface{}, input,
+	nilInput string, value interface{}, urlValue string) {
 	form := NewForm(data, Fields{"ID": Field{"T", "H", nil, widget}})
 	vals := url.Values{"ID": []string{urlValue}}
-	form.Fill(vals)
 	renderData := form.RenderData()
+	if renderData.Fields[0].Input != template.HTML(nilInput) {
+		t.Errorf("Input field for nil value is\n%v\nshould be \n%v",
+			renderData.Fields[0].Input, nilInput)
+	}
+	form.Fill(vals)
+	renderData = form.RenderData()
 	if renderData.Fields[0].Input != template.HTML(input) {
 		t.Errorf("Input field is\n%v\nshould be \n%v",
 			renderData.Fields[0].Input, input)
@@ -292,36 +297,39 @@ func testWidget(t *testing.T, widget Widget, data interface{}, input string,
 }
 
 type TestDateTimeWidgetData struct {
-	ID time.Time
+	ID *time.Time
 }
 
 func TestDateTimeWidget(t *testing.T) {
 	data := TestDateTimeWidgetData{}
 	input := `<input id="ID" type="datetime" name="ID" value="2008-09-08T22:47:31-07:00"/>`
+	nilInput := `<input id="ID" type="datetime" name="ID" value=""/>`
 	value, err := time.Parse(time.RFC3339, "2008-09-08T22:47:31-07:00")
 	if err != nil {
 		t.Fatal(err)
 	}
-	testWidget(t, new(DateTimeWidget), &data, input, value,
+	testWidget(t, new(DateTimeWidget), &data, input, nilInput, value,
 		"2008-09-08T22:47:31-07:00")
 }
 
 func TestDateWidget(t *testing.T) {
 	data := TestDateTimeWidgetData{}
 	input := `<input id="ID" type="date" name="ID" value="2008-09-08"/>`
+	nilInput := `<input id="ID" type="date" name="ID" value=""/>`
 	value, err := time.Parse("2006-01-02", "2008-09-08")
 	if err != nil {
 		t.Fatal(err)
 	}
-	testWidget(t, new(DateWidget), &data, input, value, "2008-09-08")
+	testWidget(t, new(DateWidget), &data, input, nilInput, value, "2008-09-08")
 }
 
 func TestTimeWidget(t *testing.T) {
 	data := TestDateTimeWidgetData{}
 	input := `<input id="ID" type="time" name="ID" value="22:47:31"/>`
+	nilInput := `<input id="ID" type="time" name="ID" value=""/>`
 	value, err := time.Parse("15:04:05", "22:47:31")
 	if err != nil {
 		t.Fatal(err)
 	}
-	testWidget(t, new(TimeWidget), &data, input, value, "22:47:31")
+	testWidget(t, new(TimeWidget), &data, input, nilInput, value, "22:47:31")
 }

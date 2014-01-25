@@ -76,6 +76,12 @@ func (t DateTimeWidget) HTML(field string, value interface{}) template.HTML {
 	var out string
 	if obj, ok := value.(time.Time); ok {
 		out = obj.Format(time.RFC3339)
+	} else if obj, ok := value.(*time.Time); ok {
+		if obj == nil {
+			out = ""
+		} else {
+			out = obj.Format(time.RFC3339)
+		}
 	} else {
 		out = fmt.Sprintf("%v", obj)
 	}
@@ -90,6 +96,12 @@ func (t DateWidget) HTML(field string, value interface{}) template.HTML {
 	var out string
 	if obj, ok := value.(time.Time); ok {
 		out = obj.Format("2006-01-02")
+	} else if obj, ok := value.(*time.Time); ok {
+		if obj == nil {
+			out = ""
+		} else {
+			out = obj.Format("2006-01-02")
+		}
 	} else {
 		out = fmt.Sprintf("%v", obj)
 	}
@@ -104,6 +116,12 @@ func (t TimeWidget) HTML(field string, value interface{}) template.HTML {
 	var out string
 	if obj, ok := value.(time.Time); ok {
 		out = obj.Format("15:04:05")
+	} else if obj, ok := value.(*time.Time); ok {
+		if obj == nil {
+			out = ""
+		} else {
+			out = obj.Format("15:04:05")
+		}
 	} else {
 		out = fmt.Sprintf("%v", obj)
 	}
