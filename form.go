@@ -1,5 +1,5 @@
 // This file is part of monsti/form.
-// Copyright 2012 Christian Neumann
+// Copyright 2012-2014 Christian Neumann
 
 // monsti/form is free software: you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -18,16 +18,16 @@ package form
 
 import (
 	"fmt"
-	"github.com/gorilla/schema"
 	"html"
 	"html/template"
 	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
-)
+	"time"
 
-var schemaDecoder = schema.NewDecoder()
+	"github.com/gorilla/schema"
+)
 
 // FieldRenderData contains the data needed for field rendering.
 type FieldRenderData struct {
@@ -44,7 +44,7 @@ type FieldRenderData struct {
 	Errors []string
 }
 
-// RenderData contains the data needed for form rendering. 
+// RenderData contains the data needed for form rendering.
 type RenderData struct {
 	Fields []FieldRenderData
 	Errors []string
@@ -58,12 +58,84 @@ type Widget interface {
 	HTML(name string, value interface{}) template.HTML
 }
 
+// timeConverter converts a string to a time.Time
+func timeConverter(in string) reflect.Value {
+	out, err := time.Parse(time.RFC3339, in)
+	if err != nil {
+		out, err = time.Parse("2006-01-02", in)
+	}
+	if err != nil {
+		out, _ = time.Parse("15:04:05", in)
+	}
+	return reflect.ValueOf(out)
+}
+
+type DateTimeWidget int
+
+func (t DateTimeWidget) HTML(field string, value interface{}) template.HTML {
+	var out string
+	if obj, ok := value.(time.Time); ok {
+		out = obj.Format(time.RFC3339)
+	} else if obj, ok := value.(*time.Time); ok {
+		if obj == nil {
+			out = ""
+		} else {
+			out = obj.Format(time.RFC3339)
+		}
+	} else {
+		out = fmt.Sprintf("%v", obj)
+	}
+	return template.HTML(fmt.Sprintf(
+		`<input id="%v" type="datetime" name="%v" value="%v"/>`,
+		field, field, html.EscapeString(out)))
+}
+
+type DateWidget int
+
+func (t DateWidget) HTML(field string, value interface{}) template.HTML {
+	var out string
+	if obj, ok := value.(time.Time); ok {
+		out = obj.Format("2006-01-02")
+	} else if obj, ok := value.(*time.Time); ok {
+		if obj == nil {
+			out = ""
+		} else {
+			out = obj.Format("2006-01-02")
+		}
+	} else {
+		out = fmt.Sprintf("%v", obj)
+	}
+	return template.HTML(fmt.Sprintf(
+		`<input id="%v" type="date" name="%v" value="%v"/>`,
+		field, field, html.EscapeString(out)))
+}
+
+type TimeWidget int
+
+func (t TimeWidget) HTML(field string, value interface{}) template.HTML {
+	var out string
+	if obj, ok := value.(time.Time); ok {
+		out = obj.Format("15:04:05")
+	} else if obj, ok := value.(*time.Time); ok {
+		if obj == nil {
+			out = ""
+		} else {
+			out = obj.Format("15:04:05")
+		}
+	} else {
+		out = fmt.Sprintf("%v", obj)
+	}
+	return template.HTML(fmt.Sprintf(
+		`<input id="%v" type="time" name="%v" value="%v"/>`,
+		field, field, html.EscapeString(out)))
+}
+
 type Text int
 
 func (t Text) HTML(field string, value interface{}) template.HTML {
 	return template.HTML(fmt.Sprintf(
 		`<input id="%v" type="text" name="%v" value="%v"/>`,
-		strings.ToLower(field), field, html.EscapeString(
+		field, field, html.EscapeString(
 			fmt.Sprintf("%v", value))))
 }
 
@@ -72,7 +144,7 @@ type AlohaEditor int
 func (t AlohaEditor) HTML(field string, value interface{}) template.HTML {
 	return template.HTML(fmt.Sprintf(
 		`<textarea class="editor" id="%v" name="%v"/>%v</textarea>`,
-		strings.ToLower(field), field, html.EscapeString(
+		field, field, html.EscapeString(
 			fmt.Sprintf("%v", value))))
 }
 
@@ -81,7 +153,7 @@ type TextArea int
 func (t TextArea) HTML(field string, value interface{}) template.HTML {
 	return template.HTML(fmt.Sprintf(
 		`<textarea id="%v" name="%v"/>%v</textarea>`,
-		strings.ToLower(field), field, html.EscapeString(
+		field, field, html.EscapeString(
 			fmt.Sprintf("%v", value))))
 }
 
@@ -106,7 +178,7 @@ func (t SelectWidget) HTML(field string, value interface{}) template.HTML {
 			v.Value, selected, v.Text)
 	}
 	ret := fmt.Sprintf("<select id=\"%v\" name=\"%v\">\n%v</select>",
-		strings.ToLower(field), field, options)
+		field, field, options)
 	return template.HTML(ret)
 }
 
@@ -116,7 +188,7 @@ type HiddenWidget int
 func (t HiddenWidget) HTML(field string, value interface{}) template.HTML {
 	return template.HTML(
 		fmt.Sprintf(`<input id="%v" type="hidden" name="%v" value="%v"/>`,
-			strings.ToLower(field), field, value))
+			field, field, value))
 }
 
 // PasswordWidget renders a password field.
@@ -125,7 +197,7 @@ type PasswordWidget int
 func (t PasswordWidget) HTML(field string, value interface{}) template.HTML {
 	return template.HTML(
 		fmt.Sprintf(`<input id="%v" type="password" name="%v"/>`,
-			strings.ToLower(field), field))
+			field, field))
 }
 
 // FileWidget renders a file upload field.
@@ -134,7 +206,7 @@ type FileWidget int
 func (t FileWidget) HTML(field string, value interface{}) template.HTML {
 	return template.HTML(
 		fmt.Sprintf(`<input id="%v" type="file" name="%v"/>`,
-			strings.ToLower(field), field))
+			field, field))
 }
 
 // Field contains settings for a form field.
@@ -156,6 +228,8 @@ type Form struct {
 
 // NewForm creates a new Form with the given fields with data stored in the
 // given pointer to a structure.
+//
+// In panics if data is not a pointer to a struct.
 func NewForm(data interface{}, fields Fields) *Form {
 	if dataType := reflect.TypeOf(data); dataType.Kind() != reflect.Ptr ||
 		dataType.Elem().Kind() != reflect.Struct {
@@ -167,30 +241,35 @@ func NewForm(data interface{}, fields Fields) *Form {
 }
 
 // RenderData returns a RenderData struct for the form.
+//
+// It panics if a registered field is not present in the data struct.
 func (f Form) RenderData() (renderData RenderData) {
 	dataVal := reflect.ValueOf(f.data).Elem()
 	renderData.Fields = make([]FieldRenderData, 0, dataVal.NumField()-1)
-	for i := 0; i < dataVal.NumField(); i++ {
-		fieldType := dataVal.Type().Field(i)
-		fieldVal := dataVal.Field(i)
-		name := strings.ToLower(fieldType.Name)
-		setup, ok := f.Fields[fieldType.Name]
-		if !ok {
-			panic("Field " + fieldType.Name + " has not been set up.")
-		}
-		widget := setup.Widget
+	for name, field := range f.Fields {
+		widget := field.Widget
 		if widget == nil {
 			widget = new(Text)
 		} else if _, ok := widget.(*FileWidget); ok {
 			renderData.EncTypeAttr = `enctype="multipart/form-data"`
 		}
+		matchFunc := func(field string) bool {
+			if strings.ToLower(field) == strings.ToLower(name) {
+				return true
+			}
+			return false
+		}
+		fieldVal := dataVal.FieldByNameFunc(matchFunc)
+		if !fieldVal.IsValid() {
+			panic("form: Registered field not present in data struct: " + name)
+		}
 		renderData.Fields = append(renderData.Fields, FieldRenderData{
-			Label: setup.Label,
+			Label: field.Label,
 			LabelTag: template.HTML(fmt.Sprintf(`<label for="%v">%v</label>`,
-				name, setup.Label)),
-			Input:  widget.HTML(fieldType.Name, fieldVal.Interface()),
-			Help:   setup.Help,
-			Errors: f.errors[fieldType.Name]})
+				name, field.Label)),
+			Input:  widget.HTML(name, fieldVal.Interface()),
+			Help:   field.Help,
+			Errors: f.errors[name]})
 	}
 	renderData.Errors = f.errors[""]
 	return
@@ -208,17 +287,26 @@ func (f *Form) AddError(field string, error string) {
 
 // Fill fills the form data with the given values and validates the form.
 //
+// It panics if a field has been set up which is not present in the
+// data struct.
+//
 // Returns true iff the form validates.
 func (f *Form) Fill(values url.Values) bool {
-	error := schemaDecoder.Decode(f.data, values)
+	decoder := schema.NewDecoder()
+	decoder.RegisterConverter(time.Time{}, timeConverter)
+	error := decoder.Decode(f.data, values)
 	switch e := error.(type) {
 	case nil:
 		return f.validate()
 	case schema.MultiError:
 		for field, msg := range e {
-			if f.errors[field] == nil {
+			v, ok := f.errors[field]
+			switch {
+			case !ok:
+				f.errors[""] = []string{msg.Error()}
+			case v == nil:
 				f.errors[field] = []string{msg.Error()}
-			} else {
+			default:
 				f.errors[field] = append(f.errors[field], msg.Error())
 			}
 		}
@@ -226,7 +314,6 @@ func (f *Form) Fill(values url.Values) bool {
 	default:
 		panic(error.Error())
 	}
-	return true
 }
 
 // validate validates the currently present data.

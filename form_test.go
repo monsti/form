@@ -1,5 +1,5 @@
 // This file is part of monsti/form.
-// Copyright 2012 Christian Neumann
+// Copyright 2012-2014 Christian Neumann
 
 // monsti/form is free software: you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -17,13 +17,19 @@
 package form
 
 import (
-	"log"
+	"html/template"
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 )
 
+type TestDataEmbed struct {
+	Title string
+}
+
 type TestData struct {
+	TestDataEmbed
 	Name string
 	Age  int
 }
@@ -31,11 +37,13 @@ type TestData struct {
 func TestRender(t *testing.T) {
 	data := TestData{}
 	form := NewForm(&data, Fields{
-		"Name": Field{"Your name", "Your full name", Required("Req!"), nil},
-		"Age":  Field{"Your age", "Years since your birth.", Required("Req!"), nil}})
+		"Title": Field{"Your title", "", nil, nil},
+		"Name":  Field{"Your name", "Your full name", Required("Req!"), nil},
+		"Age":   Field{"Your age", "Years since your birth.", Required("Req!"), nil}})
 	vals := url.Values{
-		"Name": []string{""},
-		"Age":  []string{"14"}}
+		"Title": []string{""},
+		"Name":  []string{""},
+		"Age":   []string{"14"}}
 	form.Fill(vals)
 	renderData := form.RenderData()
 	fieldTests := []struct {
@@ -43,22 +51,33 @@ func TestRender(t *testing.T) {
 		Expected FieldRenderData
 	}{
 		{
+			Field: "Title",
+			Expected: FieldRenderData{
+				Label:    "Your title",
+				LabelTag: `<label for="Title">Your title</label>`,
+				Help:     "",
+				Errors:   nil,
+				Input:    `<input id="Title" type="text" name="Title" value=""/>`}},
+		{
 			Field: "Name",
 			Expected: FieldRenderData{
 				Label:    "Your name",
-				LabelTag: `<label for="name">Your name</label>`,
+				LabelTag: `<label for="Name">Your name</label>`,
 				Help:     "Your full name",
 				Errors:   []string{"Req!"},
-				Input:    `<input id="name" type="text" name="Name" value=""/>`}},
+				Input:    `<input id="Name" type="text" name="Name" value=""/>`}},
 		{
-			Field: "Age",
+			Field: "AGE",
 			Expected: FieldRenderData{
 				Label:    "Your age",
-				LabelTag: `<label for="age">Your age</label>`,
+				LabelTag: `<label for="Age">Your age</label>`,
 				Help:     "Years since your birth.",
 				Errors:   nil,
-				Input:    `<input id="age" type="text" name="Age" value="14"/>`}}}
+				Input:    `<input id="Age" type="text" name="Age" value="14"/>`}}}
 	for i, test := range fieldTests {
+		if len(renderData.Errors) > 0 {
+			t.Errorf("RenderData contains general errors: %v", renderData.Errors)
+		}
 		if !reflect.DeepEqual(renderData.Fields[i], test.Expected) {
 			t.Errorf("RenderData for Field '%v' =\n%v,\nexpected\n%v",
 				test.Field, renderData.Fields[i], test.Expected)
@@ -74,7 +93,6 @@ func TestAddError(t *testing.T) {
 	form.AddError("Name", "Foo")
 	form.AddError("", "Bar")
 	renderData := form.RenderData()
-	log.Println(renderData)
 	if len(renderData.Fields[0].Errors) != 1 ||
 		renderData.Fields[0].Errors[0] != "Foo" {
 		t.Errorf(`Field "Name" should have error "Foo"`)
@@ -132,7 +150,8 @@ func TestFill(t *testing.T) {
 		"Name": []string{"Foo"},
 		"Age":  []string{"14"}}
 	if !form.Fill(vals) {
-		t.Errorf("form.Fill(..) returns false, should be true.")
+		t.Errorf("form.Fill(..) returns false, should be true. Errors: %v",
+			form.RenderData().Errors)
 	}
 	vals["Name"] = []string{""}
 	data.Name = ""
@@ -201,19 +220,19 @@ func TestSelectWidget(t *testing.T) {
 	tests := []struct {
 		Name, Value, Expected string
 	}{
-		{"TestSelect", "", `<select id="testselect" name="TestSelect">
+		{"TestSelect", "", `<select id="TestSelect" name="TestSelect">
 <option value="foo">The Foo!</option>
 <option value="bar">The Bar!</option>
 </select>`},
-		{"TestSelect2", "unknown!", `<select id="testselect2" name="TestSelect2">
+		{"TestSelect2", "unknown!", `<select id="TestSelect2" name="TestSelect2">
 <option value="foo">The Foo!</option>
 <option value="bar">The Bar!</option>
 </select>`},
-		{"TestSelect3", "foo", `<select id="testselect3" name="TestSelect3">
+		{"TestSelect3", "foo", `<select id="TestSelect3" name="TestSelect3">
 <option value="foo" selected>The Foo!</option>
 <option value="bar">The Bar!</option>
 </select>`},
-		{"TestSelect4", "bar", `<select id="testselect4" name="TestSelect4">
+		{"TestSelect4", "bar", `<select id="TestSelect4" name="TestSelect4">
 <option value="foo">The Foo!</option>
 <option value="bar" selected>The Bar!</option>
 </select>`}}
@@ -228,8 +247,8 @@ func TestSelectWidget(t *testing.T) {
 
 func TestHiddenWidget(t *testing.T) {
 	widget := new(HiddenWidget)
-	ret := widget.HTML("Foo", "bar")
-	expected := `<input id="foo" type="hidden" name="Foo" value="bar"/>`
+	ret := widget.HTML("foo", "bar")
+	expected := `<input id="foo" type="hidden" name="foo" value="bar"/>`
 	if string(ret) != expected {
 		t.Errorf(`HiddenWidget.HTML("Foo", "bar") = "%v", should be "%v".`,
 			ret, expected)
@@ -238,8 +257,8 @@ func TestHiddenWidget(t *testing.T) {
 
 func TestFileWidget(t *testing.T) {
 	widget := new(FileWidget)
-	ret := widget.HTML("Foo", "")
-	expected := `<input id="foo" type="file" name="Foo"/>`
+	ret := widget.HTML("foo", "")
+	expected := `<input id="foo" type="file" name="foo"/>`
 	if string(ret) != expected {
 		t.Errorf(`FileWidget.HTML("Foo", "") = "%v", should be "%v".`,
 			ret, expected)
@@ -248,10 +267,69 @@ func TestFileWidget(t *testing.T) {
 
 func TestPasswordWidget(t *testing.T) {
 	widget := new(PasswordWidget)
-	ret := widget.HTML("Foo", "")
-	expected := `<input id="foo" type="password" name="Foo"/>`
+	ret := widget.HTML("foo", "")
+	expected := `<input id="foo" type="password" name="foo"/>`
 	if string(ret) != expected {
 		t.Errorf(`PasswordWidget.HTML("Foo", "") = "%v", should be "%v".`,
 			ret, expected)
 	}
+}
+
+func testWidget(t *testing.T, widget Widget, data interface{}, input,
+	nilInput string, value interface{}, urlValue string) {
+	form := NewForm(data, Fields{"ID": Field{"T", "H", nil, widget}})
+	vals := url.Values{"ID": []string{urlValue}}
+	renderData := form.RenderData()
+	if renderData.Fields[0].Input != template.HTML(nilInput) {
+		t.Errorf("Input field for nil value is\n%v\nshould be \n%v",
+			renderData.Fields[0].Input, nilInput)
+	}
+	form.Fill(vals)
+	renderData = form.RenderData()
+	if renderData.Fields[0].Input != template.HTML(input) {
+		t.Errorf("Input field is\n%v\nshould be \n%v",
+			renderData.Fields[0].Input, input)
+	}
+	if reflect.DeepEqual(reflect.ValueOf(value),
+		reflect.ValueOf(data).Elem().FieldByName("ID")) {
+		t.Errorf("Data is\n%v\nshould be \n%v", data, value)
+	}
+}
+
+type TestDateTimeWidgetData struct {
+	ID *time.Time
+}
+
+func TestDateTimeWidget(t *testing.T) {
+	data := TestDateTimeWidgetData{}
+	input := `<input id="ID" type="datetime" name="ID" value="2008-09-08T22:47:31-07:00"/>`
+	nilInput := `<input id="ID" type="datetime" name="ID" value=""/>`
+	value, err := time.Parse(time.RFC3339, "2008-09-08T22:47:31-07:00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testWidget(t, new(DateTimeWidget), &data, input, nilInput, value,
+		"2008-09-08T22:47:31-07:00")
+}
+
+func TestDateWidget(t *testing.T) {
+	data := TestDateTimeWidgetData{}
+	input := `<input id="ID" type="date" name="ID" value="2008-09-08"/>`
+	nilInput := `<input id="ID" type="date" name="ID" value=""/>`
+	value, err := time.Parse("2006-01-02", "2008-09-08")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testWidget(t, new(DateWidget), &data, input, nilInput, value, "2008-09-08")
+}
+
+func TestTimeWidget(t *testing.T) {
+	data := TestDateTimeWidgetData{}
+	input := `<input id="ID" type="time" name="ID" value="22:47:31"/>`
+	nilInput := `<input id="ID" type="time" name="ID" value=""/>`
+	value, err := time.Parse("15:04:05", "22:47:31")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testWidget(t, new(TimeWidget), &data, input, nilInput, value, "22:47:31")
 }
