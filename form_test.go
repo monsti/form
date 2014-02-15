@@ -148,7 +148,9 @@ func TestFill(t *testing.T) {
 		"Age":  Field{"Your age", "Years since your birth.", Required("Req!"), nil}})
 	vals := url.Values{
 		"Name": []string{"Foo"},
-		"Age":  []string{"14"}}
+		"Age":  []string{"14"},
+		"Foo":  []string{"noting here"},
+	}
 	if !form.Fill(vals) {
 		t.Errorf("form.Fill(..) returns false, should be true. Errors: %v",
 			form.RenderData().Errors)

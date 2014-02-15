@@ -290,11 +290,19 @@ func (f *Form) AddError(field string, error string) {
 // It panics if a field has been set up which is not present in the
 // data struct.
 //
+// Values that don't match a field will be ignored.
+//
 // Returns true iff the form validates.
 func (f *Form) Fill(values url.Values) bool {
 	decoder := schema.NewDecoder()
 	decoder.RegisterConverter(time.Time{}, timeConverter)
-	error := decoder.Decode(f.data, values)
+	filtered := make(map[string][]string, 0)
+	for field, value := range values {
+		if _, ok := f.Fields[field]; ok {
+			filtered[field] = value
+		}
+	}
+	error := decoder.Decode(f.data, filtered)
 	switch e := error.(type) {
 	case nil:
 		return f.validate()
