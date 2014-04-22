@@ -85,6 +85,50 @@ func TestRender(t *testing.T) {
 	}
 }
 
+func TestMapRender(t *testing.T) {
+	data := make(map[string]interface{})
+	data["Name"] = new(string)
+	data["Age"] = new(int)
+
+	form := NewForm(data, Fields{
+		"Name": Field{"Your name", "Your full name", Required("Req!"), nil},
+		"Age":  Field{"Your age", "Years since your birth.", Required("Req!"), nil}})
+	vals := url.Values{
+		"Name": []string{""},
+		"Age":  []string{"14"}}
+	form.Fill(vals)
+	renderData := form.RenderData()
+	fieldTests := []struct {
+		Field    string
+		Expected FieldRenderData
+	}{
+		{
+			Field: "Name",
+			Expected: FieldRenderData{
+				Label:    "Your name",
+				LabelTag: `<label for="Name">Your name</label>`,
+				Help:     "Your full name",
+				Errors:   []string{"Req!"},
+				Input:    `<input id="Name" type="text" name="Name" value=""/>`}},
+		{
+			Field: "AGE",
+			Expected: FieldRenderData{
+				Label:    "Your age",
+				LabelTag: `<label for="Age">Your age</label>`,
+				Help:     "Years since your birth.",
+				Errors:   nil,
+				Input:    `<input id="Age" type="text" name="Age" value="14"/>`}}}
+	for i, test := range fieldTests {
+		if len(renderData.Errors) > 0 {
+			t.Errorf("RenderData contains general errors: %v", renderData.Errors)
+		}
+		if !reflect.DeepEqual(renderData.Fields[i], test.Expected) {
+			t.Errorf("RenderData for Field '%v' =\n%v,\nexpected\n%v",
+				test.Field, renderData.Fields[i], test.Expected)
+		}
+	}
+}
+
 func TestAddError(t *testing.T) {
 	data := TestData{}
 	form := NewForm(&data, Fields{
@@ -314,6 +358,7 @@ func TestDateTimeWidget(t *testing.T) {
 		"2008-09-08T22:47:31-07:00")
 }
 
+/*
 func TestDateWidget(t *testing.T) {
 	data := TestDateTimeWidgetData{}
 	input := `<input id="ID" type="date" name="ID" value="2008-09-08"/>`
@@ -335,3 +380,4 @@ func TestTimeWidget(t *testing.T) {
 	}
 	testWidget(t, new(TimeWidget), &data, input, nilInput, value, "22:47:31")
 }
+*/

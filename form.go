@@ -17,16 +17,16 @@
 package form
 
 import (
+	"encoding/json"
 	"fmt"
 	"html"
 	"html/template"
+	"log"
 	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/gorilla/schema"
 )
 
 // FieldRenderData contains the data needed for field rendering.
@@ -231,9 +231,10 @@ type Form struct {
 //
 // In panics if data is not a pointer to a struct.
 func NewForm(data interface{}, fields Fields) *Form {
-	if dataType := reflect.TypeOf(data); dataType.Kind() != reflect.Ptr ||
-		dataType.Elem().Kind() != reflect.Struct {
-		panic("NewForm(data, fields) expects data to be a pointer to a struct.")
+	if dataType := reflect.TypeOf(data); (dataType.Kind() != reflect.Ptr ||
+		dataType.Elem().Kind() != reflect.Struct) &&
+		dataType.Kind() != reflect.Map {
+		panic("NewForm(data, fields) expects data to be a map or a pointer to a struct.")
 	}
 	form := Form{data: data, Fields: fields,
 		errors: make(map[string][]string, len(fields))}
@@ -244,8 +245,7 @@ func NewForm(data interface{}, fields Fields) *Form {
 //
 // It panics if a registered field is not present in the data struct.
 func (f Form) RenderData() (renderData RenderData) {
-	dataVal := reflect.ValueOf(f.data).Elem()
-	renderData.Fields = make([]FieldRenderData, 0, dataVal.NumField()-1)
+	renderData.Fields = make([]FieldRenderData, 0)
 	for name, field := range f.Fields {
 		widget := field.Widget
 		if widget == nil {
@@ -253,15 +253,21 @@ func (f Form) RenderData() (renderData RenderData) {
 		} else if _, ok := widget.(*FileWidget); ok {
 			renderData.EncTypeAttr = `enctype="multipart/form-data"`
 		}
-		matchFunc := func(field string) bool {
-			if strings.ToLower(field) == strings.ToLower(name) {
-				return true
+		var fieldVal reflect.Value
+		if reflect.TypeOf(f.data).Kind() == reflect.Map {
+			fieldVal = reflect.ValueOf(f.data).MapIndex(
+				reflect.ValueOf(name))
+		} else {
+			matchFunc := func(field string) bool {
+				if strings.ToLower(field) == strings.ToLower(name) {
+					return true
+				}
+				return false
 			}
-			return false
+			fieldVal = reflect.ValueOf(f.data).Elem().FieldByNameFunc(matchFunc)
 		}
-		fieldVal := dataVal.FieldByNameFunc(matchFunc)
 		if !fieldVal.IsValid() {
-			panic("form: Registered field not present in data struct: " + name)
+			panic("form: Registered field not present in data struct: " + name + fmt.Sprintf("%v", f.data))
 		}
 		renderData.Fields = append(renderData.Fields, FieldRenderData{
 			Label: field.Label,
@@ -285,6 +291,48 @@ func (f *Form) AddError(field string, error string) {
 	f.errors[field] = append(f.errors[field], error)
 }
 
+const (
+	rawField = iota
+	boolField
+	stringField
+)
+
+type fieldType struct {
+	IsArray   bool
+	ValueType int
+}
+
+func getFieldType(data interface{}, field string) (ret fieldType) {
+	dataType := reflect.TypeOf(data)
+	var fieldValue reflect.Value
+	switch {
+	case dataType.Kind() == reflect.Ptr &&
+		dataType.Elem().Kind() == reflect.Struct:
+		fieldValue = reflect.ValueOf(data).Elem().FieldByName(field)
+	case dataType.Kind() == reflect.Map:
+		fieldValue = reflect.ValueOf(data).MapIndex(reflect.ValueOf(field))
+	default:
+		log.Println(fmt.Sprintf("%v", data))
+		panic("getFieldType expects data to be a map or a pointer to a struct.")
+	}
+	innerFieldType := fieldValue.Type()
+	if fieldValue.Type().Kind() == reflect.Slice {
+		ret.IsArray = true
+		innerFieldType = innerFieldType.Elem()
+	}
+	switch innerFieldType.Kind() {
+	case reflect.Bool:
+		ret.ValueType = boolField
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		ret.ValueType = rawField
+	default:
+		ret.ValueType = stringField
+	}
+	return
+}
+
 // Fill fills the form data with the given values and validates the form.
 //
 // It panics if a field has been set up which is not present in the
@@ -294,34 +342,53 @@ func (f *Form) AddError(field string, error string) {
 //
 // Returns true iff the form validates.
 func (f *Form) Fill(values url.Values) bool {
-	decoder := schema.NewDecoder()
-	decoder.RegisterConverter(time.Time{}, timeConverter)
-	filtered := make(map[string][]string, 0)
-	for field, value := range values {
+	doc := []byte("{")
+	for field, fieldValue := range values {
 		if _, ok := f.Fields[field]; ok {
-			filtered[field] = value
-		}
-	}
-	error := decoder.Decode(f.data, filtered)
-	switch e := error.(type) {
-	case nil:
-		return f.validate()
-	case schema.MultiError:
-		for field, msg := range e {
-			v, ok := f.errors[field]
-			switch {
-			case !ok:
-				f.errors[""] = []string{msg.Error()}
-			case v == nil:
-				f.errors[field] = []string{msg.Error()}
-			default:
-				f.errors[field] = append(f.errors[field], msg.Error())
+			doc = append(doc, fmt.Sprintf(`%q:`, field)...)
+			fieldType := getFieldType(f.data, field)
+			if fieldType.IsArray {
+				doc = append(doc, '[')
 			}
+			values := make([]string, 0)
+			for _, value := range fieldValue {
+				var JSONValue string
+				switch fieldType.ValueType {
+				case rawField:
+					JSONValue = value
+				case boolField:
+					if value != "" {
+						JSONValue = "true"
+					} else {
+						JSONValue = "false"
+					}
+				case stringField:
+					JSONValue = fmt.Sprintf("%q", value)
+				}
+				values = append(values, JSONValue)
+			}
+			doc = append(doc, strings.Join(values, ",")...)
+			if fieldType.IsArray {
+				doc = append(doc, ']')
+			}
+			doc = append(doc, ',')
 		}
-		return false
-	default:
-		panic(error.Error())
 	}
+	doc = append(doc[:len(doc)-1], '}')
+	log.Println(string(doc))
+	var err error
+	if reflect.TypeOf(f.data).Kind() == reflect.Map {
+		//		out := struct{ Fields map[string]interface{} }{}
+		err = json.Unmarshal(doc, &f.data)
+		log.Println(f.data)
+	} else {
+		err = json.Unmarshal(doc, f.data)
+	}
+	if err != nil {
+		panic(err)
+		return false
+	}
+	return f.validate()
 }
 
 // validate validates the currently present data.
@@ -331,7 +398,12 @@ func (f *Form) Fill(values url.Values) bool {
 func (f *Form) validate() bool {
 	anyError := false
 	for name, field := range f.Fields {
-		value := reflect.ValueOf(f.data).Elem().FieldByName(name)
+		var value reflect.Value
+		if reflect.TypeOf(f.data).Kind() == reflect.Map {
+			value = reflect.ValueOf(f.data).MapIndex(reflect.ValueOf(name))
+		} else {
+			value = reflect.ValueOf(f.data).Elem().FieldByName(name)
+		}
 		if value == reflect.ValueOf(nil) {
 			panic(fmt.Sprintf("Field '%v' not present in form data structure.",
 				name))
