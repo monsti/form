@@ -17,14 +17,14 @@
 package form
 
 import (
-	"encoding/json"
+	"encoding"
 	"fmt"
 	"html"
 	"html/template"
-	"log"
 	"net/url"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -253,27 +253,15 @@ func (f Form) RenderData() (renderData RenderData) {
 		} else if _, ok := widget.(*FileWidget); ok {
 			renderData.EncTypeAttr = `enctype="multipart/form-data"`
 		}
-		var fieldVal reflect.Value
-		if reflect.TypeOf(f.data).Kind() == reflect.Map {
-			fieldVal = reflect.ValueOf(f.data).MapIndex(
-				reflect.ValueOf(name))
-		} else {
-			matchFunc := func(field string) bool {
-				if strings.ToLower(field) == strings.ToLower(name) {
-					return true
-				}
-				return false
-			}
-			fieldVal = reflect.ValueOf(f.data).Elem().FieldByNameFunc(matchFunc)
-		}
-		if !fieldVal.IsValid() {
-			panic("form: Registered field not present in data struct: " + name + fmt.Sprintf("%v", f.data))
+		value, err := f.getNestedField(name)
+		if err != nil {
+			value = reflect.ValueOf("")
 		}
 		renderData.Fields = append(renderData.Fields, FieldRenderData{
 			Label: field.Label,
 			LabelTag: template.HTML(fmt.Sprintf(`<label for="%v">%v</label>`,
 				name, field.Label)),
-			Input:  widget.HTML(name, fieldVal.Interface()),
+			Input:  widget.HTML(name, value.Interface()),
 			Help:   field.Help,
 			Errors: f.errors[name]})
 	}
@@ -302,35 +290,105 @@ type fieldType struct {
 	ValueType int
 }
 
-func getFieldType(data interface{}, field string) (ret fieldType) {
-	dataType := reflect.TypeOf(data)
-	var fieldValue reflect.Value
-	switch {
-	case dataType.Kind() == reflect.Ptr &&
-		dataType.Elem().Kind() == reflect.Struct:
-		fieldValue = reflect.ValueOf(data).Elem().FieldByName(field)
-	case dataType.Kind() == reflect.Map:
-		fieldValue = reflect.ValueOf(data).MapIndex(reflect.ValueOf(field))
+// getNestedField searches for the given nested field in the given data
+func (f Form) getNestedField(field string) (reflect.Value, error) {
+	return f.findNestedField(field, nil)
+}
+
+// findNestedField searches for the given field in the form data.
+//
+// If setValue is given, it will be set to the field.
+func (f *Form) findNestedField(field string, setValue interface{}) (reflect.Value, error) {
+	//log.Println("getNestedField", f.data, field, setValue)
+	parts := strings.Split(field, ".")
+	value := reflect.ValueOf(f.data)
+	for len(parts) != 0 {
+		setIt := len(parts) == 1 && setValue != nil
+		part := parts[0]
+		//	log.Println("dig", part)
+		switch value.Type().Kind() {
+		case reflect.Ptr, reflect.Interface:
+			//	log.Println("Iface/Ptr")
+			value = value.Elem()
+			continue
+		case reflect.Struct:
+			//log.Println("Struct")
+			value = value.FieldByName(part)
+		case reflect.Map:
+			//	log.Println("Map")
+			if setIt {
+				//log.Println("Set in map")
+				value.SetMapIndex(reflect.ValueOf(part), reflect.ValueOf(setValue))
+				return reflect.Value{}, nil
+			}
+			value = value.MapIndex(reflect.ValueOf(part))
+		default:
+			return reflect.Value{},
+				fmt.Errorf("form: Can't find field %q in data", field)
+		}
+		if !value.IsValid() {
+			return reflect.Value{},
+				fmt.Errorf("form: Invalid field %q in data", field)
+		}
+		//		log.Println("got value:", value)
+		parts = parts[1:]
+	}
+	if setValue != nil {
+		if value.Type().Kind() == reflect.Ptr {
+			//log.Println("setValue", setValue)
+			v := reflect.New(value.Type().Elem())
+			v.Elem().Set(reflect.ValueOf(setValue))
+			value.Set(v)
+		} else {
+			value.Set(reflect.ValueOf(setValue))
+		}
+	}
+	if value.Type().Kind() == reflect.Interface {
+		value = value.Elem()
+	}
+	return value, nil
+}
+
+// stringToValue converts the given source string to a value of the
+// given target type.
+func stringToValue(src string, target reflect.Type) interface{} {
+	//log.Printf("stringToValue(%v,%v)", target, src)
+	if target.Implements(reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()) {
+		if target.Kind() == reflect.Ptr {
+			target = target.Elem()
+		}
+		val := reflect.New(target)
+		val.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(src))
+		return val.Elem().Interface()
+	}
+	if target.Kind() == reflect.Ptr {
+		target = target.Elem()
+	}
+	switch target.Kind() {
+	case reflect.String:
+		//log.Println("set string")
+		return src
+	case reflect.Int:
+		v, err := strconv.ParseInt(src, 0, 0)
+		if err != nil {
+			panic("woopsy " + err.Error())
+		}
+		return int(v)
 	default:
-		log.Println(fmt.Sprintf("%v", data))
-		panic("getFieldType expects data to be a map or a pointer to a struct.")
+		//log.Println(target)
+		panic("unknown kind")
 	}
-	innerFieldType := fieldValue.Type()
-	if fieldValue.Type().Kind() == reflect.Slice {
-		ret.IsArray = true
-		innerFieldType = innerFieldType.Elem()
+	return nil
+}
+
+// setNestedField searches for the given nested field in the given data
+func (f *Form) setNestedField(field string, value string) {
+	val, err := f.findNestedField(field, nil)
+	if err == nil {
+		//log.Println("set", field, "to", value, "in", f.data, "value", val)
+		f.findNestedField(field, stringToValue(value, val.Type()))
+		//log.Println("seted", field, "to", value, f.data)
 	}
-	switch innerFieldType.Kind() {
-	case reflect.Bool:
-		ret.ValueType = boolField
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-		reflect.Float32, reflect.Float64:
-		ret.ValueType = rawField
-	default:
-		ret.ValueType = stringField
-	}
-	return
 }
 
 // Fill fills the form data with the given values and validates the form.
@@ -342,51 +400,22 @@ func getFieldType(data interface{}, field string) (ret fieldType) {
 //
 // Returns true iff the form validates.
 func (f *Form) Fill(values url.Values) bool {
-	doc := []byte("{")
-	for field, fieldValue := range values {
-		if _, ok := f.Fields[field]; ok {
-			doc = append(doc, fmt.Sprintf(`%q:`, field)...)
-			fieldType := getFieldType(f.data, field)
-			if fieldType.IsArray {
-				doc = append(doc, '[')
+	for param, paramValue := range values {
+		if _, ok := f.Fields[param]; ok {
+			//log.Println("param", param, paramValue)
+			fieldValue, err := f.getNestedField(param)
+			if err != nil {
+				//log.Println("err for field ", param, f.data)
+				continue
 			}
-			values := make([]string, 0)
-			for _, value := range fieldValue {
-				var JSONValue string
-				switch fieldType.ValueType {
-				case rawField:
-					JSONValue = value
-				case boolField:
-					if value != "" {
-						JSONValue = "true"
-					} else {
-						JSONValue = "false"
-					}
-				case stringField:
-					JSONValue = fmt.Sprintf("%q", value)
-				}
-				values = append(values, JSONValue)
+			fieldType := fieldValue.Type()
+			if fieldType.Kind() == reflect.Slice {
+				fieldType = fieldType.Elem()
 			}
-			doc = append(doc, strings.Join(values, ",")...)
-			if fieldType.IsArray {
-				doc = append(doc, ']')
+			for _, value := range paramValue {
+				f.setNestedField(param, value)
 			}
-			doc = append(doc, ',')
 		}
-	}
-	doc = append(doc[:len(doc)-1], '}')
-	log.Println(string(doc))
-	var err error
-	if reflect.TypeOf(f.data).Kind() == reflect.Map {
-		//		out := struct{ Fields map[string]interface{} }{}
-		err = json.Unmarshal(doc, &f.data)
-		log.Println(f.data)
-	} else {
-		err = json.Unmarshal(doc, f.data)
-	}
-	if err != nil {
-		panic(err)
-		return false
 	}
 	return f.validate()
 }
@@ -398,15 +427,9 @@ func (f *Form) Fill(values url.Values) bool {
 func (f *Form) validate() bool {
 	anyError := false
 	for name, field := range f.Fields {
-		var value reflect.Value
-		if reflect.TypeOf(f.data).Kind() == reflect.Map {
-			value = reflect.ValueOf(f.data).MapIndex(reflect.ValueOf(name))
-		} else {
-			value = reflect.ValueOf(f.data).Elem().FieldByName(name)
-		}
-		if value == reflect.ValueOf(nil) {
-			panic(fmt.Sprintf("Field '%v' not present in form data structure.",
-				name))
+		value, err := f.getNestedField(name)
+		if err != nil {
+			return false
 		}
 		if field.Validator != nil {
 			if errors := field.Validator(value.Interface()); errors != nil {
