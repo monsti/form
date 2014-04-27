@@ -52,7 +52,11 @@ func TestRender(t *testing.T) {
 		"Extra.ExtraField": []string{"Hey!"},
 	}
 	form.Fill(vals)
+	form.Action = "targetURL"
 	renderData := form.RenderData()
+	if renderData.Action != "targetURL" {
+		t.Errorf(`renderData.Action = %q, should be "targetURL"`, renderData.Action)
+	}
 	fieldTests := []struct {
 		Field    string
 		Expected FieldRenderData

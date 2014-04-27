@@ -52,6 +52,7 @@ type RenderData struct {
 	// contains a File widget. Should be used as optional attribute for the form
 	// element if the form may contain file input elements.
 	EncTypeAttr template.HTMLAttr
+	Action      string
 }
 
 type Widget interface {
@@ -224,6 +225,8 @@ type Form struct {
 	Fields map[string]Field
 	data   interface{}
 	errors map[string][]string
+	// Action defines the action parameter of the HTML form
+	Action string
 }
 
 // NewForm creates a new Form with the given fields with data stored in the
@@ -245,6 +248,7 @@ func NewForm(data interface{}, fields Fields) *Form {
 //
 // It panics if a registered field is not present in the data struct.
 func (f Form) RenderData() (renderData RenderData) {
+	renderData.Action = f.Action
 	renderData.Fields = make([]FieldRenderData, 0)
 	for name, field := range f.Fields {
 		widget := field.Widget
