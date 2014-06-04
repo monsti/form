@@ -44,7 +44,7 @@ Then you can use the form like this:
 	}
 
 Fill the render data into a form template like this (html/template):
-	<form action="" method="POST" accept-charset="utf-8" {{.EncTypeAttr}}>
+	<form action="{{.Action}}" method="POST" accept-charset="utf-8" {{.EncTypeAttr}}>
 		<fieldset>
 			<div class="control-group {{if .Errors}}error{{end}}">
 				<div class="controls">

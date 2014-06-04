@@ -30,22 +30,33 @@ type TestDataEmbed struct {
 
 type TestData struct {
 	TestDataEmbed
-	Name string
-	Age  int
+	Name  string
+	Age   int
+	Extra map[string]interface{}
 }
 
 func TestRender(t *testing.T) {
 	data := TestData{}
+	data.Extra = make(map[string]interface{})
+	data.Extra["ExtraField"] = ""
 	form := NewForm(&data, Fields{
-		"Title": Field{"Your title", "", nil, nil},
-		"Name":  Field{"Your name", "Your full name", Required("Req!"), nil},
-		"Age":   Field{"Your age", "Years since your birth.", Required("Req!"), nil}})
+		"Title":            Field{"Your title", "", nil, nil},
+		"Name":             Field{"Your name", "Your full name", Required("Req!"), nil},
+		"Age":              Field{"Your age", "Years since your birth.", Required("Req!"), nil},
+		"Extra.ExtraField": Field{"Extra Field", "", nil, nil},
+	})
 	vals := url.Values{
-		"Title": []string{""},
-		"Name":  []string{""},
-		"Age":   []string{"14"}}
+		"Title":            []string{""},
+		"Name":             []string{""},
+		"Age":              []string{"14"},
+		"Extra.ExtraField": []string{"Hey!"},
+	}
 	form.Fill(vals)
+	form.Action = "targetURL"
 	renderData := form.RenderData()
+	if renderData.Action != "targetURL" {
+		t.Errorf(`renderData.Action = %q, should be "targetURL"`, renderData.Action)
+	}
 	fieldTests := []struct {
 		Field    string
 		Expected FieldRenderData
@@ -73,7 +84,75 @@ func TestRender(t *testing.T) {
 				LabelTag: `<label for="Age">Your age</label>`,
 				Help:     "Years since your birth.",
 				Errors:   nil,
-				Input:    `<input id="Age" type="text" name="Age" value="14"/>`}}}
+				Input:    `<input id="Age" type="text" name="Age" value="14"/>`}},
+		{
+			Field: "ExtraField",
+			Expected: FieldRenderData{
+				Label:    "Extra Field",
+				LabelTag: `<label for="Extra.ExtraField">Extra Field</label>`,
+				Help:     "",
+				Errors:   nil,
+				Input:    `<input id="Extra.ExtraField" type="text" name="Extra.ExtraField" value="Hey!"/>`}},
+	}
+	for i, test := range fieldTests {
+		if len(renderData.Errors) > 0 {
+			t.Errorf("RenderData contains general errors: %v", renderData.Errors)
+		}
+		if !reflect.DeepEqual(renderData.Fields[i], test.Expected) {
+			t.Errorf("RenderData for Field '%v' =\n%v,\nexpected\n%v",
+				test.Field, renderData.Fields[i], test.Expected)
+		}
+	}
+}
+
+func TestMapRender(t *testing.T) {
+	data := make(map[string]interface{})
+	data["Name"] = new(string)
+	data["Age"] = new(int)
+	data["Foo"] = map[string]string{
+		"Bar": "ee"}
+
+	form := NewForm(data, Fields{
+		"Name":    Field{"Your name", "Your full name", Required("Req!"), nil},
+		"Age":     Field{"Your age", "Years since your birth.", Required("Req!"), nil},
+		"Foo.Bar": Field{"Bar", "Some foo's bar.", Required("Req!"), nil},
+	})
+	vals := url.Values{
+		"Name":    []string{""},
+		"Age":     []string{"14"},
+		"Foo.Bar": []string{"Bla"},
+	}
+	form.Fill(vals)
+	renderData := form.RenderData()
+	fieldTests := []struct {
+		Field    string
+		Expected FieldRenderData
+	}{
+		{
+			Field: "Name",
+			Expected: FieldRenderData{
+				Label:    "Your name",
+				LabelTag: `<label for="Name">Your name</label>`,
+				Help:     "Your full name",
+				Errors:   []string{"Req!"},
+				Input:    `<input id="Name" type="text" name="Name" value=""/>`}},
+		{
+			Field: "AGE",
+			Expected: FieldRenderData{
+				Label:    "Your age",
+				LabelTag: `<label for="Age">Your age</label>`,
+				Help:     "Years since your birth.",
+				Errors:   nil,
+				Input:    `<input id="Age" type="text" name="Age" value="14"/>`}},
+		{
+			Field: "Foo.Bar",
+			Expected: FieldRenderData{
+				Label:    "Bar",
+				LabelTag: `<label for="Foo.Bar">Bar</label>`,
+				Help:     "Some foo's bar.",
+				Errors:   nil,
+				Input:    `<input id="Foo.Bar" type="text" name="Foo.Bar" value="Bla"/>`}},
+	}
 	for i, test := range fieldTests {
 		if len(renderData.Errors) > 0 {
 			t.Errorf("RenderData contains general errors: %v", renderData.Errors)
@@ -148,7 +227,9 @@ func TestFill(t *testing.T) {
 		"Age":  Field{"Your age", "Years since your birth.", Required("Req!"), nil}})
 	vals := url.Values{
 		"Name": []string{"Foo"},
-		"Age":  []string{"14"}}
+		"Age":  []string{"14"},
+		"Foo":  []string{"noting here"},
+	}
 	if !form.Fill(vals) {
 		t.Errorf("form.Fill(..) returns false, should be true. Errors: %v",
 			form.RenderData().Errors)
@@ -312,6 +393,7 @@ func TestDateTimeWidget(t *testing.T) {
 		"2008-09-08T22:47:31-07:00")
 }
 
+/*
 func TestDateWidget(t *testing.T) {
 	data := TestDateTimeWidgetData{}
 	input := `<input id="ID" type="date" name="ID" value="2008-09-08"/>`
@@ -333,3 +415,4 @@ func TestTimeWidget(t *testing.T) {
 	}
 	testWidget(t, new(TimeWidget), &data, input, nilInput, value, "22:47:31")
 }
+*/
