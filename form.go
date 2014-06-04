@@ -303,25 +303,19 @@ func (f Form) getNestedField(field string) (reflect.Value, error) {
 //
 // If setValue is given, it will be set to the field.
 func (f *Form) findNestedField(field string, setValue interface{}) (reflect.Value, error) {
-	//log.Println("getNestedField", f.data, field, setValue)
 	parts := strings.Split(field, ".")
 	value := reflect.ValueOf(f.data)
 	for len(parts) != 0 {
 		setIt := len(parts) == 1 && setValue != nil
 		part := parts[0]
-		//	log.Println("dig", part)
 		switch value.Type().Kind() {
 		case reflect.Ptr, reflect.Interface:
-			//	log.Println("Iface/Ptr")
 			value = value.Elem()
 			continue
 		case reflect.Struct:
-			//log.Println("Struct")
 			value = value.FieldByName(part)
 		case reflect.Map:
-			//	log.Println("Map")
 			if setIt {
-				//log.Println("Set in map")
 				value.SetMapIndex(reflect.ValueOf(part), reflect.ValueOf(setValue))
 				return reflect.Value{}, nil
 			}
@@ -334,12 +328,10 @@ func (f *Form) findNestedField(field string, setValue interface{}) (reflect.Valu
 			return reflect.Value{},
 				fmt.Errorf("form: Invalid field %q in data", field)
 		}
-		//		log.Println("got value:", value)
 		parts = parts[1:]
 	}
 	if setValue != nil {
 		if value.Type().Kind() == reflect.Ptr {
-			//log.Println("setValue", setValue)
 			v := reflect.New(value.Type().Elem())
 			v.Elem().Set(reflect.ValueOf(setValue))
 			value.Set(v)
@@ -356,7 +348,6 @@ func (f *Form) findNestedField(field string, setValue interface{}) (reflect.Valu
 // stringToValue converts the given source string to a value of the
 // given target type.
 func stringToValue(src string, target reflect.Type) interface{} {
-	//log.Printf("stringToValue(%v,%v)", target, src)
 	if target.Implements(reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()) {
 		if target.Kind() == reflect.Ptr {
 			target = target.Elem()
@@ -370,17 +361,21 @@ func stringToValue(src string, target reflect.Type) interface{} {
 	}
 	switch target.Kind() {
 	case reflect.String:
-		//log.Println("set string")
 		return src
 	case reflect.Int:
 		v, err := strconv.ParseInt(src, 0, 0)
 		if err != nil {
-			panic("woopsy " + err.Error())
+			return 0
 		}
 		return int(v)
+	case reflect.Bool:
+		v, err := strconv.ParseBool(src)
+		if err != nil {
+			return false
+		}
+		return v
 	default:
-		//log.Println(target)
-		panic("unknown kind")
+		panic(fmt.Sprintln("form: Unknown field kind", target.Kind()))
 	}
 	return nil
 }
@@ -389,9 +384,7 @@ func stringToValue(src string, target reflect.Type) interface{} {
 func (f *Form) setNestedField(field string, value string) {
 	val, err := f.findNestedField(field, nil)
 	if err == nil {
-		//log.Println("set", field, "to", value, "in", f.data, "value", val)
 		f.findNestedField(field, stringToValue(value, val.Type()))
-		//log.Println("seted", field, "to", value, f.data)
 	}
 }
 
@@ -406,10 +399,8 @@ func (f *Form) setNestedField(field string, value string) {
 func (f *Form) Fill(values url.Values) bool {
 	for param, paramValue := range values {
 		if _, ok := f.Fields[param]; ok {
-			//log.Println("param", param, paramValue)
 			fieldValue, err := f.getNestedField(param)
 			if err != nil {
-				//log.Println("err for field ", param, f.data)
 				continue
 			}
 			fieldType := fieldValue.Type()
