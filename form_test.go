@@ -222,17 +222,29 @@ func TestEncTypeAttr(t *testing.T) {
 
 func TestFill(t *testing.T) {
 	data := TestData{}
+	data.Extra = make(map[string]interface{}, 0)
+	data.Extra["Number"] = new(int)
 	form := NewForm(&data, Fields{
-		"Name": Field{"Your name", "Your full name", Required("Req!"), nil},
-		"Age":  Field{"Your age", "Years since your birth.", Required("Req!"), nil}})
+		"Name":         Field{"Your name", "Your full name", Required("Req!"), nil},
+		"Age":          Field{"Your age", "Years since your birth.", Required("Req!"), nil},
+		"Extra.Number": Field{"Number", "", nil, nil},
+	})
 	vals := url.Values{
-		"Name": []string{"Foo"},
-		"Age":  []string{"14"},
-		"Foo":  []string{"noting here"},
+		"Name":         []string{"Foo"},
+		"Age":          []string{"14"},
+		"Foo":          []string{"noting here"},
+		"Extra.Number": []string{"10"},
 	}
+	expected := TestData{Name: "Foo", Age: 14}
+	expected.Extra = make(map[string]interface{}, 0)
+	number := 10
+	expected.Extra["Number"] = number
 	if !form.Fill(vals) {
 		t.Errorf("form.Fill(..) returns false, should be true. Errors: %v",
 			form.RenderData().Errors)
+	}
+	if !reflect.DeepEqual(expected, data) {
+		t.Errorf("Filled data should be %v, is %v", expected, data)
 	}
 	vals["Name"] = []string{""}
 	data.Name = ""
