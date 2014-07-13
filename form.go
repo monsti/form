@@ -212,17 +212,14 @@ func (t FileWidget) HTML(field string, value interface{}) template.HTML {
 
 // Field contains settings for a form field.
 type Field struct {
-	Label, Help string
-	Validator   Validator
-	Widget      Widget
+	Id, Label, Help string
+	Validator       Validator
+	Widget          Widget
 }
-
-// Fields is a map of field names to field settings.
-type Fields map[string]Field
 
 // Form represents an html form.
 type Form struct {
-	Fields map[string]Field
+	Fields []Field
 	data   interface{}
 	errors map[string][]string
 	// Action defines the action parameter of the HTML form
@@ -233,7 +230,7 @@ type Form struct {
 // given pointer to a structure.
 //
 // In panics if data is not a pointer to a struct.
-func NewForm(data interface{}, fields Fields) *Form {
+func NewForm(data interface{}, fields []Field) *Form {
 	if dataType := reflect.TypeOf(data); (dataType.Kind() != reflect.Ptr ||
 		dataType.Elem().Kind() != reflect.Struct) &&
 		dataType.Kind() != reflect.Map {
@@ -250,24 +247,24 @@ func NewForm(data interface{}, fields Fields) *Form {
 func (f Form) RenderData() (renderData RenderData) {
 	renderData.Action = f.Action
 	renderData.Fields = make([]FieldRenderData, 0)
-	for name, field := range f.Fields {
+	for _, field := range f.Fields {
 		widget := field.Widget
 		if widget == nil {
 			widget = new(Text)
 		} else if _, ok := widget.(*FileWidget); ok {
 			renderData.EncTypeAttr = `enctype="multipart/form-data"`
 		}
-		value, err := f.getNestedField(name)
+		value, err := f.getNestedField(field.Id)
 		if err != nil {
 			value = reflect.ValueOf("")
 		}
 		renderData.Fields = append(renderData.Fields, FieldRenderData{
 			Label: field.Label,
 			LabelTag: template.HTML(fmt.Sprintf(`<label for="%v">%v</label>`,
-				name, field.Label)),
-			Input:  widget.HTML(name, value.Interface()),
+				field.Id, field.Label)),
+			Input:  widget.HTML(field.Id, value.Interface()),
 			Help:   field.Help,
-			Errors: f.errors[name]})
+			Errors: f.errors[field.Id]})
 	}
 	renderData.Errors = f.errors[""]
 	return
@@ -397,9 +394,9 @@ func (f *Form) setNestedField(field string, value string) {
 //
 // Returns true iff the form validates.
 func (f *Form) Fill(values url.Values) bool {
-	for param, paramValue := range values {
-		if _, ok := f.Fields[param]; ok {
-			fieldValue, err := f.getNestedField(param)
+	for _, field := range f.Fields {
+		if paramValue, ok := values[field.Id]; ok {
+			fieldValue, err := f.getNestedField(field.Id)
 			if err != nil {
 				continue
 			}
@@ -408,7 +405,7 @@ func (f *Form) Fill(values url.Values) bool {
 				fieldType = fieldType.Elem()
 			}
 			for _, value := range paramValue {
-				f.setNestedField(param, value)
+				f.setNestedField(field.Id, value)
 			}
 		}
 	}
@@ -421,14 +418,14 @@ func (f *Form) Fill(values url.Values) bool {
 // Returns true iff the data validates.
 func (f *Form) validate() bool {
 	anyError := false
-	for name, field := range f.Fields {
-		value, err := f.getNestedField(name)
+	for _, field := range f.Fields {
+		value, err := f.getNestedField(field.Id)
 		if err != nil {
 			return false
 		}
 		if field.Validator != nil {
 			if errors := field.Validator(value.Interface()); errors != nil {
-				f.errors[name] = errors
+				f.errors[field.Id] = errors
 				anyError = true
 			}
 		}

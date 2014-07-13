@@ -39,11 +39,11 @@ func TestRender(t *testing.T) {
 	data := TestData{}
 	data.Extra = make(map[string]interface{})
 	data.Extra["ExtraField"] = ""
-	form := NewForm(&data, Fields{
-		"Title":            Field{"Your title", "", nil, nil},
-		"Name":             Field{"Your name", "Your full name", Required("Req!"), nil},
-		"Age":              Field{"Your age", "Years since your birth.", Required("Req!"), nil},
-		"Extra.ExtraField": Field{"Extra Field", "", nil, nil},
+	form := NewForm(&data, []Field{
+		Field{"Title", "Your title", "", nil, nil},
+		Field{"Name", "Your name", "Your full name", Required("Req!"), nil},
+		Field{"Age", "Your age", "Years since your birth.", Required("Req!"), nil},
+		Field{"Extra.ExtraField", "Extra Field", "", nil, nil},
 	})
 	vals := url.Values{
 		"Title":            []string{""},
@@ -112,10 +112,10 @@ func TestMapRender(t *testing.T) {
 	data["Foo"] = map[string]string{
 		"Bar": "ee"}
 
-	form := NewForm(data, Fields{
-		"Name":    Field{"Your name", "Your full name", Required("Req!"), nil},
-		"Age":     Field{"Your age", "Years since your birth.", Required("Req!"), nil},
-		"Foo.Bar": Field{"Bar", "Some foo's bar.", Required("Req!"), nil},
+	form := NewForm(data, []Field{
+		Field{"Name", "Your name", "Your full name", Required("Req!"), nil},
+		Field{"Age", "Your age", "Years since your birth.", Required("Req!"), nil},
+		Field{"Foo.Bar", "Bar", "Some foo's bar.", Required("Req!"), nil},
 	})
 	vals := url.Values{
 		"Name":    []string{""},
@@ -166,9 +166,9 @@ func TestMapRender(t *testing.T) {
 
 func TestAddError(t *testing.T) {
 	data := TestData{}
-	form := NewForm(&data, Fields{
-		"Name": Field{"Your name", "Your full name", Required("Req!"), nil},
-		"Age":  Field{"Your age", "Years since your birth.", Required("Req!"), nil}})
+	form := NewForm(&data, []Field{
+		Field{"Name", "Your name", "Your full name", Required("Req!"), nil},
+		Field{"Age", "Your age", "Years since your birth.", Required("Req!"), nil}})
 	form.AddError("Name", "Foo")
 	form.AddError("", "Bar")
 	renderData := form.RenderData()
@@ -199,15 +199,15 @@ func TestEncTypeAttr(t *testing.T) {
 		EncType string
 	}{
 		{
-			Form: NewForm(&data, Fields{
-				"Name": Field{"Your name", "Your full name", Required("Req!"),
+			Form: NewForm(&data, []Field{
+				Field{"Name", "Your name", "Your full name", Required("Req!"),
 					nil},
-				"File": Field{"File Dummy", "", nil, nil}}),
+				Field{"File", "File Dummy", "", nil, nil}}),
 			EncType: ""},
 		{
-			Form: NewForm(&data, Fields{
-				"Name": Field{"Your name", "Your full name", Required("Req!"), nil},
-				"File": Field{"File!", "", nil, new(FileWidget)}}),
+			Form: NewForm(&data, []Field{
+				Field{"Name", "Your name", "Your full name", Required("Req!"), nil},
+				Field{"File", "File!", "", nil, new(FileWidget)}}),
 			EncType: `enctype="multipart/form-data"`}}
 
 	for i, v := range fieldTests {
@@ -224,10 +224,10 @@ func TestFill(t *testing.T) {
 	data := TestData{}
 	data.Extra = make(map[string]interface{}, 0)
 	data.Extra["Number"] = new(int)
-	form := NewForm(&data, Fields{
-		"Name":         Field{"Your name", "Your full name", Required("Req!"), nil},
-		"Age":          Field{"Your age", "Years since your birth.", Required("Req!"), nil},
-		"Extra.Number": Field{"Number", "", nil, nil},
+	form := NewForm(&data, []Field{
+		Field{"Name", "Your name", "Your full name", Required("Req!"), nil},
+		Field{"Age", "Your age", "Years since your birth.", Required("Req!"), nil},
+		Field{"Extra.Number", "Number", "", nil, nil},
 	})
 	vals := url.Values{
 		"Name":         []string{"Foo"},
@@ -370,7 +370,7 @@ func TestPasswordWidget(t *testing.T) {
 
 func testWidget(t *testing.T, widget Widget, data interface{}, input,
 	nilInput string, value interface{}, urlValue string) {
-	form := NewForm(data, Fields{"ID": Field{"T", "H", nil, widget}})
+	form := NewForm(data, []Field{Field{"ID", "T", "H", nil, widget}})
 	vals := url.Values{"ID": []string{urlValue}}
 	renderData := form.RenderData()
 	if renderData.Fields[0].Input != template.HTML(nilInput) {
